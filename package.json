@@ -1,0 +1,23 @@
+{
+  "name": "classbook-2015",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:full": "npx --yes vercel@54.21.1 dev --local",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "npm run build && node --check api/people/index.js && node --check api/people/[id].js && node --check lib/db.js && node --check lib/blob.js"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.5.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^6.4.3"
+  }
+}

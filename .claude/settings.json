@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"/d/AJAY WAGH JE IT/SAMPLE_PROJECT/NOTEBOOK\" && rm -rf dist)",
+      "Bash(npx vercel *)",
+      "Bash(npx --yes vercel --version)"
+    ]
+  }
+}

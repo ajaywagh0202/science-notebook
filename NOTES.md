@@ -1,0 +1,9 @@
+# Assumptions & design decisions
+
+- **Photo transport:** photos are sent to the API as base64 `data:` URLs inside the normal JSON body, not multipart form data. Vercel's Node serverless functions parse JSON bodies automatically, so this avoids pulling in a multipart parser (`busboy`/`formidable`) for what is otherwise a very small app. Trade-off documented in README under "Known limits".
+- **Roster JSON save strategy:** public Blob overwrites can serve stale data for up to 60 seconds. Each save therefore writes a unique immutable `data/people-<timestamp>-<uuid>.json` blob, then deletes the prior version. There is still one logical roster JSON blob at rest, and the legacy `data/people.json` path is discovered and migrated automatically on the next write.
+- **Photo filenames:** each photo is uploaded to a UUID-based path under `personal/`, `family/`, or `college/` so it never collides with another blob.
+- **Birthday field:** stored as a full `YYYY-MM-DD` value from an HTML `<input type="date">` rather than free-text `MM-DD`, since the data model allows either and a date input gives simpler, validated entry. `src/utils/date.js` parses either format.
+- **Marital status "spouseName":** only shown/collected when `maritalStatus === "married"`.
+- **Deleting a person:** removes the roster record first, then deletes its `oldCollegePhoto`, `personalPhoto`, and all `familyPhotos` blobs. Photo cleanup is non-fatal, so a transient photo-delete error cannot leave a live entry pointing at already-deleted images.
+- **No backend validation beyond "name is required"** — consistent with the open, trusted-group model described in the prompt (no accounts, no ownership checks).
