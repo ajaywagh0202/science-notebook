@@ -1,13 +1,13 @@
 # Class Book
 
-A private alumni directory for the batch of 2015 — no login, no server to manage, just a shared link. The whole app (React frontend, API, and storage) runs as a single Vercel project.
+A private alumni directory for the batch of 2015 — no user accounts or separate server to manage, just a shared link. The whole app (React frontend, API, and storage) runs as a single Vercel project.
 
 ## Stack
 
 - **Frontend:** React + Vite
 - **Backend:** Node.js Vercel Serverless Functions under `/api`
 - **Storage:** [`@vercel/blob`](https://vercel.com/docs/storage/vercel-blob) — one roster JSON blob holds all directory data, and every uploaded photo is its own blob file. Only the blob URL is stored in the roster JSON.
-- **Auth:** none. This is a closed, trusted-group app — anyone with the link can add or edit any entry. See "Trust model" below.
+- **Profile protection:** each profile has its own password. Reading remains public to the group, while editing and deletion require that profile's password.
 
 ## Project layout
 
@@ -16,6 +16,7 @@ A private alumni directory for the batch of 2015 — no login, no server to mana
 /api/people/[id].js     GET one, PUT update, DELETE
 /lib/db.js              roster JSON blob read/modify/write helper
 /lib/blob.js             photo upload/delete + public/private resolution helpers
+/lib/password.js         password validation, scrypt hashing, and verification
 /src                     React app (pages, components, styles)
 ```
 
@@ -55,9 +56,12 @@ Make sure the Blob store is connected to the project (step 2 above) **before** y
 
 There's no seed script — add 2-3 sample entries by opening the deployed site and using **"Add Myself"** on the roster page. Each submission goes through the real API and writes into the roster JSON blob, so this doubles as a smoke test of the whole read/write path.
 
-## Trust model & photo privacy (read this)
+## Profile passwords & photo privacy (read this)
 
-- There are no accounts or passwords. Anyone with the link can create, edit, or delete any entry — this is intentional for a small, trusted friend group re-connecting after years apart.
+- There are no user accounts or sessions. Every new profile requires its own password, and that password is required for all updates and deletions.
+- Passwords are never stored directly. The roster stores only a salted `scrypt` hash, and API responses remove the hash before returning profile data.
+- There is no password recovery. Profile owners must keep their password safe.
+- Profiles created before password protection show a one-time **Protect Legacy Profile** screen. Because the app has no identity system, the first trusted group member to protect an older profile becomes its password holder.
 - Every photo (personal photo, each family photo) has a `visibility` flag: `public` or `private`, defaulting to **private** on upload. The old college photo is always public.
 - In the roster grid, private personal photos never render — a silhouette placeholder is shown instead.
 - On a profile page, private photos show blurred with a "Tap to reveal" button. Revealing only changes what's shown in your browser for that page load — it does **not** change the stored visibility flag or grant any other viewer access.

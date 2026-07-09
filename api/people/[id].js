@@ -6,6 +6,12 @@ import {
   getPhotoUrls,
   deletePhotos,
 } from '../../lib/blob.js';
+import {
+  hashPassword,
+  toPublicPerson,
+  validatePassword,
+  verifyPassword,
+} from '../../lib/password.js';
 
 function noStore(res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -19,7 +25,7 @@ export default async function handler(req, res) {
       noStore(res);
       const person = await db.getById(id);
       if (!person) return res.status(404).json({ error: 'Not found' });
-      return res.status(200).json(person);
+      return res.status(200).json(toPublicPerson(person));
     } catch (err) {
       console.error('Failed to load entry', err);
       return res.status(500).json({
@@ -35,6 +41,31 @@ export default async function handler(req, res) {
       if (!existing) return res.status(404).json({ error: 'Not found' });
 
       const body = req.body || {};
+
+      // Profiles created before password protection can be claimed once.
+      // Claiming only sets a password; it cannot alter any profile fields.
+      if (!existing.passwordAuth) {
+        if (body.action !== 'claim') {
+          return res.status(409).json({
+            error: 'This older profile must be password-protected before it can be edited.',
+          });
+        }
+        const passwordError = validatePassword(body.newPassword);
+        if (passwordError) return res.status(400).json({ error: passwordError });
+
+        const passwordAuth = await hashPassword(body.newPassword);
+        const claimed = await db.update(id, (prev) => ({
+          ...prev,
+          passwordAuth,
+          updatedAt: new Date().toISOString(),
+        }));
+        noStore(res);
+        return res.status(200).json(toPublicPerson(claimed));
+      }
+
+      if (!(await verifyPassword(body.profilePassword, existing.passwordAuth))) {
+        return res.status(401).json({ error: 'Incorrect profile password' });
+      }
       if (!body.name || !body.name.trim()) {
         return res.status(400).json({ error: 'Name is required' });
       }
@@ -82,7 +113,7 @@ export default async function handler(req, res) {
       const keptUrls = new Set(getPhotoUrls(updated));
       await deletePhotos(getPhotoUrls(existing).filter((url) => !keptUrls.has(url)));
       noStore(res);
-      return res.status(200).json(updated);
+      return res.status(200).json(toPublicPerson(updated));
     } catch (err) {
       await deletePhotos(uploadedUrls);
       console.error('Failed to update entry', err);
@@ -94,6 +125,14 @@ export default async function handler(req, res) {
     try {
       const existing = await db.getById(id);
       if (!existing) return res.status(404).json({ error: 'Not found' });
+      if (!existing.passwordAuth) {
+        return res.status(409).json({
+          error: 'This older profile must be password-protected before it can be deleted.',
+        });
+      }
+      if (!(await verifyPassword(req.body?.profilePassword, existing.passwordAuth))) {
+        return res.status(401).json({ error: 'Incorrect profile password' });
+      }
 
       await db.remove(id);
       await deletePhotos(getPhotoUrls(existing));

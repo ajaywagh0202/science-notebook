@@ -6,4 +6,5 @@
 - **Birthday field:** stored as a full `YYYY-MM-DD` value from an HTML `<input type="date">` rather than free-text `MM-DD`, since the data model allows either and a date input gives simpler, validated entry. `src/utils/date.js` parses either format.
 - **Marital status "spouseName":** only shown/collected when `maritalStatus === "married"`.
 - **Deleting a person:** removes the roster record first, then deletes its `oldCollegePhoto`, `personalPhoto`, and all `familyPhotos` blobs. Photo cleanup is non-fatal, so a transient photo-delete error cannot leave a live entry pointing at already-deleted images.
-- **No backend validation beyond "name is required"** — consistent with the open, trusted-group model described in the prompt (no accounts, no ownership checks).
+- **Per-profile passwords:** new profiles require an 8–128 character password. Only a per-profile salted `scrypt` hash is stored; API list/detail/create/update responses strip that hash. Update and delete requests must supply the correct password.
+- **Legacy profiles:** records created before password protection are locked against edits and deletion until someone uses the one-time claim flow to set their password. With no pre-existing identity system, ownership of those older records cannot be independently verified.

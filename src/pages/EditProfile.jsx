@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { createPerson, updatePerson, deletePerson, fetchPerson, fileToDataUrl } from '../api.js';
+import {
+  claimPerson,
+  createPerson,
+  updatePerson,
+  deletePerson,
+  fetchPerson,
+  fileToDataUrl,
+} from '../api.js';
 
 const emptyForm = {
   name: '',
@@ -29,11 +36,19 @@ export default function EditProfile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [passwordProtected, setPasswordProtected] = useState(!isEditing);
+  const [profilePassword, setProfilePassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [claimPassword, setClaimPassword] = useState('');
+  const [confirmClaimPassword, setConfirmClaimPassword] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     if (!isEditing) return;
     fetchPerson(id)
       .then((person) => {
+        setPasswordProtected(person.passwordProtected);
         setForm({
           name: person.name || '',
           occupation: person.occupation || '',
@@ -104,6 +119,18 @@ export default function EditProfile() {
       setError('Name is required.');
       return;
     }
+    if (!isEditing && profilePassword.length < 8) {
+      setError('Profile password must be at least 8 characters.');
+      return;
+    }
+    if (!isEditing && profilePassword !== confirmPassword) {
+      setError('The profile passwords do not match.');
+      return;
+    }
+    if (isEditing && !profilePassword) {
+      setError('Enter your profile password to save changes.');
+      return;
+    }
     setSaving(true);
     setError('');
 
@@ -142,7 +169,9 @@ export default function EditProfile() {
         familyPhotos: familyPhotosPayload,
       };
 
-      const saved = isEditing ? await updatePerson(id, payload) : await createPerson(payload);
+      const saved = isEditing
+        ? await updatePerson(id, payload, profilePassword)
+        : await createPerson(payload, profilePassword);
       navigate(`/person/${saved.id}`);
     } catch (err) {
       setError(err.message || 'Something went wrong while saving.');
@@ -151,24 +180,107 @@ export default function EditProfile() {
   }
 
   async function handleDelete() {
+    if (!deletePassword) {
+      setDeleteError('Enter the profile password.');
+      return;
+    }
     setSaving(true);
+    setDeleteError('');
     try {
-      await deletePerson(id);
+      await deletePerson(id, deletePassword);
       navigate('/roster');
     } catch (err) {
-      setError(err.message || 'Could not delete this entry.');
+      setDeleteError(err.message || 'Could not delete this entry.');
       setSaving(false);
-      setConfirmingDelete(false);
+    }
+  }
+
+  async function handleClaim(e) {
+    e.preventDefault();
+    if (claimPassword.length < 8) {
+      setError('Profile password must be at least 8 characters.');
+      return;
+    }
+    if (claimPassword !== confirmClaimPassword) {
+      setError('The profile passwords do not match.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      await claimPerson(id, claimPassword);
+      setProfilePassword(claimPassword);
+      setPasswordProtected(true);
+      setClaimPassword('');
+      setConfirmClaimPassword('');
+      setSaving(false);
+    } catch (err) {
+      setError(err.message || 'Could not protect this profile.');
+      setSaving(false);
     }
   }
 
   if (loading) return <div className="page center-note">Loading entry...</div>;
 
+  if (isEditing && !passwordProtected) {
+    return (
+      <div className="page">
+        <h1>Protect This Profile</h1>
+        <div className="sub" style={{ marginBottom: 18 }}>
+          This profile was created before passwords were added. Set its password once before editing or deleting it.
+        </div>
+        <form className="form-card" onSubmit={handleClaim}>
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor="claimPassword">New Profile Password *</label>
+              <input
+                id="claimPassword"
+                type="password"
+                minLength="8"
+                maxLength="128"
+                autoComplete="new-password"
+                value={claimPassword}
+                onChange={(e) => setClaimPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="confirmClaimPassword">Confirm Password *</label>
+              <input
+                id="confirmClaimPassword"
+                type="password"
+                minLength="8"
+                maxLength="128"
+                autoComplete="new-password"
+                value={confirmClaimPassword}
+                onChange={(e) => setConfirmClaimPassword(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+          <p className="form-help">
+            The first person to protect an older profile becomes its password holder. There is no password recovery.
+          </p>
+          {error && <div className="error-text">{error}</div>}
+          <div className="form-actions">
+            <div />
+            <button type="submit" className="btn btn-gold" disabled={saving}>
+              {saving ? 'Protecting...' : 'Set Password & Continue'}
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <h1>{isEditing ? 'Edit My Entry' : 'Add Myself'}</h1>
       <div className="sub" style={{ marginBottom: 18 }}>
-        This directory has no login — anyone with the link can add or edit any entry. Please only edit your own.
+        {isEditing
+          ? 'Enter this profile’s password before saving any changes.'
+          : 'Choose a password that will be required whenever this profile is edited or deleted.'}
       </div>
 
       <form className="form-card" onSubmit={handleSubmit}>
@@ -212,6 +324,43 @@ export default function EditProfile() {
             <textarea id="collegeMemory" value={form.collegeMemory} onChange={(e) => updateField('collegeMemory', e.target.value)} />
           </div>
         </div>
+
+        <h3 className="section-title">Profile Protection</h3>
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor="profilePassword">
+              {isEditing ? 'Current Profile Password *' : 'Profile Password *'}
+            </label>
+            <input
+              id="profilePassword"
+              type="password"
+              minLength={isEditing ? undefined : 8}
+              maxLength="128"
+              autoComplete={isEditing ? 'current-password' : 'new-password'}
+              value={profilePassword}
+              onChange={(e) => setProfilePassword(e.target.value)}
+              required
+            />
+          </div>
+          {!isEditing && (
+            <div className="field">
+              <label htmlFor="confirmPassword">Confirm Password *</label>
+              <input
+                id="confirmPassword"
+                type="password"
+                minLength="8"
+                maxLength="128"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </div>
+          )}
+        </div>
+        <p className="form-help">
+          Use at least 8 characters and keep it safe. Password recovery is not available.
+        </p>
 
         <h3 className="section-title">Social Links</h3>
         <div className="form-grid">
@@ -335,7 +484,16 @@ export default function EditProfile() {
         <div className="form-actions">
           <div>
             {isEditing && (
-              <button type="button" className="btn btn-danger" onClick={() => setConfirmingDelete(true)} disabled={saving}>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => {
+                  setDeletePassword('');
+                  setDeleteError('');
+                  setConfirmingDelete(true);
+                }}
+                disabled={saving}
+              >
                 Delete Entry
               </button>
             )}
@@ -351,6 +509,20 @@ export default function EditProfile() {
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <h3>Delete this entry?</h3>
             <p>This removes it and all uploaded photos permanently.</p>
+            <div className="field modal-field">
+              <label htmlFor="deletePassword">Profile Password</label>
+              <input
+                id="deletePassword"
+                type="password"
+                maxLength="128"
+                autoComplete="current-password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                disabled={saving}
+                required
+              />
+            </div>
+            {deleteError && <div className="error-text">{deleteError}</div>}
             <div className="form-actions">
               <button type="button" className="btn btn-outline" onClick={() => setConfirmingDelete(false)} disabled={saving}>
                 Cancel

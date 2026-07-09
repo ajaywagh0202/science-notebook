@@ -17,24 +17,36 @@ export function fetchPerson(id) {
   return fetch(`${BASE}/people/${encodeURIComponent(id)}`, { cache: 'no-store' }).then(handleRes);
 }
 
-export function createPerson(data) {
+export function createPerson(data, profilePassword) {
   return fetch(`${BASE}/people`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, profilePassword }),
   }).then(handleRes);
 }
 
-export function updatePerson(id, data) {
+export function updatePerson(id, data, profilePassword) {
   return fetch(`${BASE}/people/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, profilePassword }),
   }).then(handleRes);
 }
 
-export function deletePerson(id) {
-  return fetch(`${BASE}/people/${encodeURIComponent(id)}`, { method: 'DELETE' }).then(handleRes);
+export function claimPerson(id, newPassword) {
+  return fetch(`${BASE}/people/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'claim', newPassword }),
+  }).then(handleRes);
+}
+
+export function deletePerson(id, profilePassword) {
+  return fetch(`${BASE}/people/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profilePassword }),
+  }).then(handleRes);
 }
 
 // Photos are sent to the API as base64 data URLs (rather than multipart

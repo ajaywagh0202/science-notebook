@@ -490,6 +490,7 @@ button {
 .field input[type='text'],
 .field input[type='date'],
 .field input[type='url'],
+.field input[type='password'],
 .field select,
 .field textarea {
   padding: 10px 12px;
@@ -502,6 +503,11 @@ button {
 .field textarea {
   resize: vertical;
   min-height: 80px;
+}
+.form-help {
+  margin: -8px 0 18px;
+  color: rgba(34, 40, 58, 0.75);
+  font-size: 0.82rem;
 }
 .photo-field {
   border: 1px dashed rgba(91, 26, 35, 0.4);
@@ -579,6 +585,10 @@ button {
 }
 .modal-card .form-actions {
   justify-content: center;
+}
+.modal-field {
+  margin: 16px 0;
+  text-align: left;
 }
 
 .center-note {

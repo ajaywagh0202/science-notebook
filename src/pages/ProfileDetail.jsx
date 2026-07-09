@@ -22,6 +22,8 @@ export default function ProfileDetail() {
   const [status, setStatus] = useState('loading');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     fetchPerson(id)
@@ -33,13 +35,18 @@ export default function ProfileDetail() {
   }, [id]);
 
   async function handleDelete() {
+    if (!deletePassword) {
+      setDeleteError('Enter the profile password.');
+      return;
+    }
     setDeleting(true);
+    setDeleteError('');
     try {
-      await deletePerson(id);
+      await deletePerson(id, deletePassword);
       navigate('/roster');
-    } catch {
+    } catch (err) {
+      setDeleteError(err.message || 'Could not delete this entry.');
       setDeleting(false);
-      setConfirmingDelete(false);
     }
   }
 
@@ -151,11 +158,21 @@ export default function ProfileDetail() {
 
       <div className="profile-actions">
         <Link to={`/edit/${person.id}`} className="btn btn-outline">
-          Edit My Entry
+          {person.passwordProtected ? 'Edit My Entry' : 'Protect Legacy Profile'}
         </Link>
-        <button type="button" className="btn btn-danger" onClick={() => setConfirmingDelete(true)}>
-          Delete Entry
-        </button>
+        {person.passwordProtected && (
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={() => {
+              setDeletePassword('');
+              setDeleteError('');
+              setConfirmingDelete(true);
+            }}
+          >
+            Delete Entry
+          </button>
+        )}
       </div>
 
       {confirmingDelete && (
@@ -163,6 +180,20 @@ export default function ProfileDetail() {
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <h3>Remove {person.name} from the register?</h3>
             <p>This deletes their entry and all uploaded photos. This can't be undone.</p>
+            <div className="field modal-field">
+              <label htmlFor="profileDeletePassword">Profile Password</label>
+              <input
+                id="profileDeletePassword"
+                type="password"
+                maxLength="128"
+                autoComplete="current-password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                disabled={deleting}
+                required
+              />
+            </div>
+            {deleteError && <div className="error-text">{deleteError}</div>}
             <div className="form-actions">
               <button type="button" className="btn btn-outline" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
                 Cancel

@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import * as db from '../../lib/db.js';
 import { uploadPhoto, resolveFamilyPhotos, deletePhotos } from '../../lib/blob.js';
+import { hashPassword, toPublicPerson, validatePassword } from '../../lib/password.js';
 
 function noStore(res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -11,7 +12,7 @@ export default async function handler(req, res) {
     try {
       noStore(res);
       const people = await db.getAll();
-      return res.status(200).json(people);
+      return res.status(200).json(people.map(toPublicPerson));
     } catch (err) {
       console.error('Failed to load roster', err);
       return res.status(500).json({
@@ -27,8 +28,13 @@ export default async function handler(req, res) {
       if (!body.name || !body.name.trim()) {
         return res.status(400).json({ error: 'Name is required' });
       }
+      const passwordError = validatePassword(body.profilePassword);
+      if (passwordError) {
+        return res.status(400).json({ error: passwordError });
+      }
 
       const now = new Date().toISOString();
+      const passwordAuth = await hashPassword(body.profilePassword);
 
       const oldCollegePhoto = body.oldCollegePhoto?.dataUrl
         ? await uploadPhoto(body.oldCollegePhoto.dataUrl, 'college').then((url) => {
@@ -72,13 +78,14 @@ export default async function handler(req, res) {
         oldCollegePhoto,
         personalPhoto,
         familyPhotos,
+        passwordAuth,
         createdAt: now,
         updatedAt: now,
       };
 
       await db.create(entry);
       noStore(res);
-      return res.status(201).json(entry);
+      return res.status(201).json(toPublicPerson(entry));
     } catch (err) {
       await deletePhotos(uploadedUrls);
       console.error('Failed to create entry', err);
